@@ -136,11 +136,11 @@ async function loadPlayer(){
  }
  try{
   const src=drive?driveMediaUrl(url):await resolveMedia(url);if(current!=='player'||epoch!==playerEpoch||!slot.isConnected)return;
-  const qualities=[{label:'Original',url:src},...(m.qualities||[])];window.currentQualities=qualities;
+  const qualities=[{label:'Original',url:src},...((type==='movie'?m.qualities:m.trailerQualities)||[])];window.currentQualities=qualities;
   const quality=qualities.length>1?`<label class="watch-quality">Quality <select id="quality" onchange="changeQuality(this.value)">${qualities.map((q,i)=>`<option value="${i}">${esc(q.label)}</option>`).join('')}</select></label>`:'';
-  slot.innerHTML=playerShell(m,type,`<div class="ss-picture"><video id="video" playsinline preload="metadata" src="${esc(src)}"></video><button class="ss-start" onclick="toggleStreamPlayback()" aria-label="Play video">▶</button><div id="ssLoading" class="ss-loading">Loading video…</div></div><div class="ss-controls"><div class="ss-timeline"><input id="ssSeek" type="range" min="0" max="100" step="0.01" value="0" aria-label="Video progress" disabled><span id="ssTime">0:00 / 0:00</span></div><div class="ss-buttons"><div class="ss-group"><button id="ssPlay" onclick="toggleStreamPlayback()" aria-label="Play">▶</button><button onclick="seekStream(-10)" aria-label="Back 10 seconds">−10s</button><button onclick="seekStream(10)" aria-label="Forward 10 seconds">+10s</button><button id="ssMute" onclick="muteStream()" aria-label="Mute">Sound on</button></div><button class="fullscreen-button" onclick="fullscreen()">⛶ Fullscreen</button></div></div>`,url.startsWith('local:')?src:url,quality);
+  slot.innerHTML=playerShell(m,type,`<div class="ss-picture"><video id="video" playsinline preload="metadata" src="${esc(src)}"></video><button class="ss-start" onclick="toggleStreamPlayback()" aria-label="Play video">▶</button><div id="ssLoading" class="ss-loading">Loading video…</div></div><div class="ss-controls"><div class="ss-timeline"><input id="ssSeek" type="range" min="0" max="100" step="0.01" value="0" aria-label="Video progress" disabled><span id="ssTime">0:00 / 0:00</span></div><div class="ss-buttons"><div class="ss-group"><button id="ssPlay" onclick="toggleStreamPlayback()" aria-label="Play">▶</button><button onclick="seekStream(-10)" aria-label="Back 10 seconds">−10s</button><button onclick="seekStream(10)" aria-label="Forward 10 seconds">+10s</button><button type="button" onclick="restartStream()" aria-label="Restart video from beginning">↺ Restart</button><button id="ssMute" onclick="muteStream()" aria-label="Mute">Sound on</button></div><button class="fullscreen-button" onclick="fullscreen()">⛶ Fullscreen</button></div></div>`,url.startsWith('local:')?src:url,quality);
   const v=$('#video');activeVideo=v;setupStreamControls(v);slot.querySelector('.watch-tools > .fullscreen-button')?.remove();
-  v.addEventListener('loadedmetadata',()=>{if(type==='movie'&&progress[m.id]?.time&&progress[m.id].time<v.duration*.95)v.currentTime=progress[m.id].time;if(m.captions)addCaptions(v,m.captions)});
+  v.addEventListener('loadedmetadata',()=>{if(type==='movie'&&progress[m.id]?.time&&progress[m.id].time<v.duration*.95)v.currentTime=progress[m.id].time;if(m.captions)addCaptions(v,m.captions)},{once:true});
   v.addEventListener('timeupdate',()=>{if(type==='movie'&&v.duration&&Date.now()-saveTick>2000){progress[m.id]={time:v.currentTime,duration:v.duration};saveProgress();saveTick=Date.now()}});
   v.addEventListener('ended',()=>{if(type==='movie'){delete progress[m.id];saveProgress()}});
   v.addEventListener('error',()=>{const note=$('#youtubeStatus');if(note)note.textContent='This video could not load. Try Open original video.'});
@@ -167,7 +167,22 @@ document.addEventListener('fullscreenchange',updateFullscreenButton);
 document.addEventListener('webkitfullscreenchange',updateFullscreenButton);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')setExpandedPlayer(false)});
 
-function changeQuality(i){const v=$('#video'),time=v.currentTime,playing=!v.paused;v.src=window.currentQualities[+i].url;v.addEventListener('loadedmetadata',function resume(){v.removeEventListener('loadedmetadata',resume);v.currentTime=Math.min(time,v.duration||time);if(playing)v.play().catch(()=>{})});v.load()}
+function restartStream(){
+ const v=$('#video');if(!v)return;
+ if(videoType==='movie'){delete progress[activeMovie];saveProgress();saveTick=Date.now()}
+ const restart=()=>{if(!v.isConnected)return;v.currentTime=0;syncStreamControls();v.play().catch(()=>{})};
+ if(v.readyState>=1)restart();else v.addEventListener('loadedmetadata',restart,{once:true});
+}
+let qualitySwitchToken=0;
+async function changeQuality(i){
+ const v=$('#video'),q=window.currentQualities?.[Number(i)];if(!v||!q)return;
+ const time=v.currentTime,playing=!v.paused,token=++qualitySwitchToken;
+ try{const src=driveId(q.url)?driveMediaUrl(q.url):await resolveMedia(q.url);
+ if(token!==qualitySwitchToken||!v.isConnected||v!==$('#video'))return;
+ v.addEventListener('loadedmetadata',()=>{if(token!==qualitySwitchToken)return;v.currentTime=Number.isFinite(v.duration)?Math.min(time,v.duration):time;if(playing)v.play().catch(()=>{})},{once:true});
+ v.src=src;v.load();
+ }catch{toast('This quality could not load. Your current video is unchanged.')}
+}
 
 
 /* PUBLIC_EXPORT_START */
