@@ -89,7 +89,7 @@ function refreshAccess(){const area=document.querySelector('.top-actions');if(ar
 function switchEmail(){adminSession=false;try{sessionStorage.removeItem('skilletstream_role');sessionStorage.removeItem('skilletstream_admitted')}catch{}refreshAccess();go('home');showStreamIntro()}
 function go(page,id){setExpandedPlayer(false);if((page==='admin'||page==='edit')&&!adminSession)page='home';stopYouTube();if(activeVideo){activeVideo.pause();activeVideo=null}objectUrls.forEach(u=>URL.revokeObjectURL(u));objectUrls=[];current=page;selected=id||null;nav();render();window.scrollTo(0,0)}
 function render(){const app=$('#app');let html='';
-if(current==='home'){const continuing=available().filter(m=>progress[m.id]&&progress[m.id].time>0&&progress[m.id].time<progress[m.id].duration*.95);if(continuing.length)html+=section('Continue Watching',continuing);html+=collectionSections(available())+section('Coming Soon',upcoming())}
+if(current==='home'){html+=collectionSections(available())+section('Coming Soon',upcoming())}
 else if(current==='movies')html='<h1>Movies & TV</h1>'+collectionLinks()+collectionSections(available());
 else if(current==='universe'||current==='outside'){const c=CATEGORIES.find(c=>c.id===current);const titles=state.movies.filter(m=>categoryFor(m)===c.id);html=`<div class="collection-heading"><div class="eyebrow">SKILLETSTREAM COLLECTION</div><h1>${esc(c.name)}</h1></div>`+collectionLinks()+section('Watch Now',titles.filter(m=>m.status==='available'))+section('Coming Soon',titles.filter(m=>m.status==='coming'))}
 else if(current==='coming')html='<h1>Coming Soon</h1>'+section('Upcoming Releases',upcoming());
